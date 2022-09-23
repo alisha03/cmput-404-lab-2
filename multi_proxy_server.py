@@ -1,4 +1,5 @@
 import socket, time
+from multiprocessing import Process
 
 #define address & buffer size
 HOST = ""
@@ -16,6 +17,19 @@ def get_remote_ip(host):
 
     print (f'Ip address of {host} is {remote_ip}')
     return remote_ip
+
+# handle requests and sends data back to client
+def handle_request(addr, conn, google_socket):
+    # send client request to google
+    send_full_data = conn.recv(BUFFER_SIZE)
+    print(f"Sending recieved data {send_full_data} to google")
+    time.sleep(0.5)
+    google_socket.sendall(send_full_data)
+    google_socket.shutdown(socket.SHUT_WR)
+
+    #send received data back to client
+    google_data = google_socket.recv(BUFFER_SIZE)
+    conn.send(google_data)
 
 def main():
 
@@ -41,16 +55,10 @@ def main():
                 remote_ip = get_remote_ip(host)
                 google_socket.connect((remote_ip, port))
                 
-                # send client request to google
-                send_full_data = conn.recv(BUFFER_SIZE)
-                print(f"Sending recieved data {send_full_data} to google")
-                time.sleep(0.5)
-                google_socket.sendall(send_full_data)
-                google_socket.shutdown(socket.SHUT_WR)
-
-                #send received data back to client
-                google_data = google_socket.recv(BUFFER_SIZE)
-                conn.send(google_data)
+                p = Process(target=handle_request, args=(addr, conn, google_socket))
+                p.daemon = True
+                p.start()
+                print("Started process", p)
 
             conn.close()
 
